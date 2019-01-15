@@ -56,11 +56,13 @@
 - 상대방이 돌을 놓은 위치(1byte)
 	> 상위 1비트는 흑/백 표시(흑:0 , 백:1), 하위 7비트는 돌이 추가된 위치를 표시(1~64)
 <img width="372" alt="2" src="https://user-images.githubusercontent.com/33616490/51172964-c6a1ec00-18f7-11e9-8805-13a70ee49af4.png">
+
 	> 해당 돌은 51 이 된다
 
 - 보드판 돌 현황(16byte)
 	> 1byte는 4개의 칸의 돌 위치를 표시함. 상위 4비트는 돌의 유/무(유:1 무:0) , 하위 4비트는 흑/백(흑:0,백:1) 여부를 표시함
 <img width="275" alt="1" src="https://user-images.githubusercontent.com/33616490/51172034-b0932c00-18f5-11e9-99ee-d9d8d3a126be.png">
+
 	> 해당 돌을 표시하기 위해선 0b 1111 0100 이 된다.
 
 - 현재 스코어(2byte)
@@ -80,4 +82,5 @@
 - 돌을 놓은 위치
 	> 상위 1비트는 흑/백 표시(흑:0 , 백:1), 하위 7비트는 돌이 추가된 위치를 표시(1~64)
 <img width="372" alt="2" src="https://user-images.githubusercontent.com/33616490/51172964-c6a1ec00-18f7-11e9-8805-13a70ee49af4.png">
+	
 	> 해당 돌은 51 이 된다
