@@ -32,6 +32,10 @@
 2. 클라이언트는 서버에서 주는 데이터를 받아서 처리한다. 서버에서 주는 데이터는 다음과 같다
 - Flag(1byte) | 턴수 (1byte) | Random(1byte) | 상대방이 돌을 놓은 위치(1byte) | 보드판 돌 현황(16byte) | 현재 스코어(2byte)
 
+<img width="717" alt="2019-01-16 2 56 05" src="https://user-images.githubusercontent.com/33616490/51229231-f3f5a500-199e-11e9-9a36-aa5070094479.png">
+
+  
+
 
 3. 서버는 클라이언트에게서 오는 정보를 가공하여 다음 행동을. 결정한다. 클라이언트에서 보내주는 데이터는 다음과 같다
 - ID(흑/백) 1byte | 턴수 (1byte) | Random(1byte) | 돌을 놓은 위치(1byte)
