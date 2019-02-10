@@ -9,13 +9,14 @@ chomp (my $default_f = `pwd`);
 my $socket = new IO::Socket::INET (
 	PeerHost => '127.0.0.1',
 	#PeerHost => '192.168.1.114',
-	PeerPort => '8472',
+	#PeerPort => '8472',
+	PeerPort => "$ARGV[0]",
 	#PeerPort => '5000',
 	Proto => 'tcp',
 );
 die "cannot connect to the server $!\n" unless $socket;
 
-print set_board(@array);
+#print set_board(@array);
 
 my $response = "";
 
@@ -59,7 +60,7 @@ sub nopoint(){
 	unless ($opponent_put eq "null"){
 		$opponent_put =~ s/\[|\]//g;
 		my ($column,$row) = split(/,/,$opponent_put);
-		push @data,"nope";
+		#		push @data,"nope";
 		push @data,(($column*8) + $row);
 		if ($data[0] == 1) { $array[$data[-1]] = 4}
 		elsif ($data[0] == 2) { $array[$data[-1]] = 3}
@@ -86,27 +87,80 @@ sub gameover()
 		}
 	}
 	
-	print "data : $data[0]\n";
-	print "win : $win\n";
 	my $wl = 'win';
 	my $color = 'black';
-	#int($data[0]) == 1 ? my $color = 'black' : my $color = 'white';
 	$wl = 'lost' unless($win == 1); 
 	$color = 'white' unless ($data[0] == 1);
 
-	my $dir = $default_f."/testdata/".$color."/".$wl;
+	my $dir = $default_f."/Mydata/".$color."/".$wl;
 	my $data_dir; shift (@data);
 	foreach(@data){
 		$data_dir .= "/".$_;
 	}
-	print "$dir.$data_dir\n";
-	system("mkdir -p $dir.$data_dir");
+	my $dd = $dir.$data_dir;
+	$dd =~ s/\/0$//g;
 	
+	print "$dd\n";
+	unless(-d $dd){
+		system("mkdir -p $dd");
+		system("echo 'sum:1' > $dd/data.txt"); 
+		system("echo 'end:end' >> $dd/data.txt"); 
+	}
 
+	my $stack;
+	while($dd ne $dir){
+		$dd =~ s/\/(\d+)$//g;
+		$stack = $1;
+
+		unless (-f "$dd/data.txt"){
+			my $chr = `cat $dd/$stack/data.txt`;
+			my @chr = split(/\n/,$chr);
+			foreach(@chr){
+				if (/(sum):(\d+)$/){
+					#$1 : sum 
+					#$2 : 상위 폴더의 sum 개수
+					#stack : 상위 폴더의 이름
+
+					system("echo '$stack:$2' > $dd/data.txt");
+					system("echo '$1:$2' >> $dd/data.txt");
+				}
+			}
+		}
+		else{ 
+			my $data = `cat $dd/data.txt`;
+			my $data1 = `cat $dd/$stack/data.txt`;
+			my @tmp = split(/\n/,$data);
+			my @tmp2 = split(/\n/,$data1);
+			my $count = 0;
+			my $new;
+			my %hash; 
+			foreach (@tmp2){
+				if (/(sum):(\d+)$/){
+					$hash{$stack} = $2;
+				}
+			}
+			foreach(@tmp){
+				if (/(\d+):(\d+)$/){
+					my $t1 = $1; 
+					my $t2 = $2;
+					if($t1 eq $stack) {$t2++}
+					$hash{$t1} = $t2;
+				}
+				if (/(sum):(\d+)$/){
+					$count = $2;
+				}
+			}
+			foreach(keys(%hash)){
+				$new .= "$_:$hash{$_}\n";
+			}
+			$count ++;
+			$new .= "sum:$count\n";
+			system ("echo '$new' > $dd/data.txt");
+		}
+		if($dd =~ /lost$|win$/ ){last;}
+	}
 
 	$socket->close();
-	print "data : @data\n";
-	print "dir : $dir\n";
 	exit();
 }
 
@@ -137,14 +191,10 @@ sub my_turn()
 		push @ret,(($column*8) + ($row));
 	}
 	my $rand = int(rand($#ret +1 ));
-	#my $put = &onetotwo($ret[0]);
-	#push @data,$ret[0];
 	my $put = &onetotwo($ret[$rand]);
 	push @data,$ret[$rand];
 	print set_board(@array);
 	&processing($data[-1], 0 );
-	print "color : $data[0] , put : $data[-1]\n";
-	print "data : @data\n";
 	$array[$data[-1]] = $data[0]+2;
 	print set_board(@array);
 	my $json = '{"type":0,"point":'."$put}";
