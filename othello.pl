@@ -3,11 +3,12 @@ use strict;
 our @array = qw /0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 2 1 0 0 0  0 0 0 1 2 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0  0 0 0 0 0 0 0 0/;
 our @data;
 our $turn_count = 0;
-our $pqd = `pwd`;
+
+chomp (my $default_f = `pwd`);
 
 my $socket = new IO::Socket::INET (
-	#PeerHost => '127.0.0.1',
-	PeerHost => '192.168.1.114',
+	PeerHost => '127.0.0.1',
+	#PeerHost => '192.168.1.114',
 	PeerPort => '8472',
 	#PeerPort => '5000',
 	Proto => 'tcp',
@@ -23,7 +24,6 @@ while(1){
 	if($response){
 		my @test = split(//,$response);
 		my ($length,$data) = unpack("N A*",$response);
-		print "$data\n";
 		my %json = json_decode($data,$length);
 		my $flag = $json{'type'};
 		if ($flag == 0){print "Ready\n"}	
@@ -39,12 +39,11 @@ $socket->close();
 
 sub write()
 {
-	my @change_index = shift;
+	my (@change_index) = @_;
 	foreach (@change_index){
 		if($array[$_] == 1 ) { $array[$_] = 2}
 		elsif($array[$_] == 2 ) { $array[$_] = 1}
 	}
-	print "change ok : @change_index\n";
 }
 
 sub start()
@@ -65,20 +64,7 @@ sub nopoint(){
 		if ($data[0] == 1) { $array[$data[-1]] = 4}
 		elsif ($data[0] == 2) { $array[$data[-1]] = 3}
 	}
-	&write(&processing($data[-1]));
-=eod
-	my $change = $hash{'changed_points'};
-	$change =~ s/\[\[/\[/g;
-	$change =~ s/\]\]/\]/g;
-	$change =~ s/^\[|\]$//g;
-
-	foreach(split(/\],\[/,$change)){
-			my ($column,$row) = split(/,/,$_);
-			my $change_index = ($column *8 + $row);
-			if   ($array[$change_index] == 1) { $array[$change_index] = 2}
-			elsif($array[$change_index] == 2) { $array[$change_index] = 1}
-		}
-=cut
+	&processing($data[-1],1);
 }
 
 sub gameover()
@@ -86,8 +72,41 @@ sub gameover()
 	my (%hash) = @_;
 	my $win = $hash{'result'};
 	print &win_ascii if ($win); 
-	print &lost_ascii unless ($win);
+	unless($win){
+		my $last_put = $hash{'opponent_put'};
+		unless ($last_put eq "null"){
+			$last_put =~ s/\[|\]//g;
+			my ($column,$row) = split(/,/,$last_put);
+			push @data,(($column*8) + $row);
+			if ($data[0] == 1) { $array[$data[-1]] = 2}
+			elsif ($data[0] == 2) { $array[$data[-1]] = 1}
+			&processing($data[-1],1);	
+			print set_board(@array);
+			print &lost_ascii unless ($win);
+		}
+	}
+	
+	print "data : $data[0]\n";
+	print "win : $win\n";
+	my $wl = 'win';
+	my $color = 'black';
+	#int($data[0]) == 1 ? my $color = 'black' : my $color = 'white';
+	$wl = 'lost' unless($win == 1); 
+	$color = 'white' unless ($data[0] == 1);
+
+	my $dir = $default_f."/testdata/".$color."/".$wl;
+	my $data_dir; shift (@data);
+	foreach(@data){
+		$data_dir .= "/".$_;
+	}
+	print "$dir.$data_dir\n";
+	system("mkdir -p $dir.$data_dir");
+	
+
+
 	$socket->close();
+	print "data : @data\n";
+	print "dir : $dir\n";
 	exit();
 }
 
@@ -97,31 +116,15 @@ sub my_turn()
 	my (%hash) = @_;
 	my @ret;
 	my $opponent_put = $hash{'opponent_put'};
+
 	unless ($opponent_put eq "null"){
 		$opponent_put =~ s/\[|\]//g;
 		my ($column,$row) = split(/,/,$opponent_put);
 		push @data,(($column*8) + $row);
-		if ($data[0] == 1) { $array[$data[-1]] = 4}
-		elsif ($data[0] == 2) { $array[$data[-1]] = 3}
-	}
-	my $change = $hash{'changed_points'};
-	print "oppent_put $hash{'opponent_put'}\n";
-	print "changed_point $hash{'changed_points'}\n";
-	print "available $hash{'available_points'}\n";
-
-	$change =~ s/\[\[/\[/g;
-	$change =~ s/\]\]/\]/g;
-	$change =~ s/^\[|\]$//g;
-
-	foreach(split(/\],\[/,$change)){
-		my ($column,$row) = split(/,/,$_);
-		my $change_index = ($column *8 + $row);
-		print "change : $change_index\n";
-		&write($change_index);
+		if ($data[0] == 1) { $array[$data[-1]] = 2}
+		elsif ($data[0] == 2) { $array[$data[-1]] = 1}
 		print set_board(@array);
-		#&write(&processing($change_index));
-		#if   ($array[$change_index] == 1) { $array[$change_index] = 2}
-		#elsif($array[$change_index] == 2) { $array[$change_index] = 1}
+		&processing($data[-1],1);
 	}
 
 	my $point = $hash{'available_points'};
@@ -133,13 +136,17 @@ sub my_turn()
 		my ($column,$row) = split(/,/,$_);
 		push @ret,(($column*8) + ($row));
 	}
-
-	my $put = &onetotwo($ret[0]);
-	push @data,$ret[0];
-	&write(&processing($data[-1]));
+	my $rand = int(rand($#ret +1 ));
+	#my $put = &onetotwo($ret[0]);
+	#push @data,$ret[0];
+	my $put = &onetotwo($ret[$rand]);
+	push @data,$ret[$rand];
+	print set_board(@array);
+	&processing($data[-1], 0 );
+	print "color : $data[0] , put : $data[-1]\n";
+	print "data : @data\n";
 	$array[$data[-1]] = $data[0]+2;
 	print set_board(@array);
-	$a = <>;
 	my $json = '{"type":0,"point":'."$put}";
 	my $length  = length($json);
 	my $header = pack("N",$length);
@@ -171,7 +178,6 @@ sub json_encode()
 	}
 	$json =~ s/,$//g;
 	$json .= "}";
-	#print "json : $json\n";
 	return $json;
 }
 
@@ -215,7 +221,6 @@ sub set_board()
 	my $print = $ascii . "\n\n\n\n\t\t\t\t\t\t ________ ________ ________ ________ ________ ________ ________ ________\n";
 	my $line =  "\t\t\t\t\t\t|________|________|________|________|________|________|________|________|\n";
 	my $index = 0;
-	#	@array = qw /2 2 2 2 2 2 2 2  1 1 1 1 1 1 1 1  1 1 1 1 1 1 1 1  0 0 0 1 2 0 0 0  0 0 0 2 1 0 0 0  0 0 0 2 1 2 1 2  0 0 0 0 0 0 0 0  0 0 0 0 2 1 1 1/;
 
 	while($index < 64){
 		for my $ttt(1 .. 3){
@@ -226,7 +231,6 @@ sub set_board()
 				elsif($array[$index + $_ - 1] == 2) {$print .=  $white}
 				elsif($array[$index + $_ - 1] == 3) {$print .=  $black_focus}
 				elsif($array[$index + $_ - 1] == 4) {$print .=  $white_focus}
-
 
 				$print .= "|";
 			}
@@ -252,10 +256,6 @@ sub win_ascii()
 	$ascii .= "\t\t\t\t\t\t\t  ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║╚═╝\n";
 	$ascii .= "\t\t\t\t\t\t\t   ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║██╗\n";
 	$ascii .= "\t\t\t\t\t\t\t   ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝\n";
-
-	return $ascii;
-
-
 }
 
 sub lost_ascii()
@@ -267,15 +267,16 @@ sub lost_ascii()
 	$ascii .= "\t\t\t\t\t\t  ╚██╔╝  ██║   ██║██║   ██║    ██║     ██║   ██║╚════██║   ██║       ██╗    ██║ \n";
 	$ascii .= "\t\t\t\t\t\t   ██║   ╚██████╔╝╚██████╔╝    ███████╗╚██████╔╝███████║   ██║       ╚═╝    ╚██╗\n";
 	$ascii .= "\t\t\t\t\t\t   ╚═╝    ╚═════╝  ╚═════╝     ╚══════╝ ╚═════╝ ╚══════╝   ╚═╝               ╚═╝\n";
-
-
-
-
 }
 
 sub processing()
 {
+	my $base_color = $data[0];
 	my $base = shift;
+	my $flag = shift;
+	if ($flag != 0) {if   ($base_color == 1) {$base_color = 2}  
+					 elsif($base_color == 2) {$base_color = 1}
+				 }
 	my $column = int($base / 8);
 	my $row = $base % 8 ;
 	my @change_ret ;
@@ -291,9 +292,9 @@ sub processing()
 	if ($a) { 
 		my @tmp;
 		my $flag = 0;
-		while($a > 0) {
-			last if ($array[$a] == 0);
-			if ($array[$a] == $data[0]) { $flag = 1; last;} 
+		while($a > -1 && $a < 64) {
+			last if ($array[$a] == 0 || int($a/8) == $column);
+			if ($array[$a] == $base_color) { $flag = 1; last;} 
 			push @tmp,$a;
 			$a -= 9;
 		}
@@ -303,9 +304,9 @@ sub processing()
 	if ($b) { 
 		my @tmp;
 		my $flag = 0;
-		while($b > 0) {
+		while($b > -1 && $b < 64) {
 			last if ($array[$b] == 0);
-			if ($array[$b] == $data[0]) { $flag = 1; last;} 
+			if ($array[$b] == $base_color) { $flag = 1; last;} 
 			push @tmp,$b;
 			$b -= 8;
 		}
@@ -315,9 +316,10 @@ sub processing()
 	if ($c) { 
 		my @tmp;
 		my $flag = 0;
-		while($c > 0) {
-			last if ($array[$c] == 0);
-			if ($array[$c] == $data[0]) { $flag = 1; last;} 
+		my $line = int($c/8);
+		while($c > -1 && $c < 64) {
+			last if ($array[$c] == 0 || int($c/8) == $column);
+			if ($array[$c] == $base_color) { $flag = 1; last;} 
 			push @tmp,$c;
 			$c -= 7;
 		}
@@ -327,9 +329,10 @@ sub processing()
 	if ($d) { 
 		my @tmp;
 		my $flag = 0;
-		while($d > 0) {
+		my $line = int ($d /8);
+		while($d > -1 && $d < 64 && $line == int ($d/8)) {
 			last if ($array[$d] == 0);
-			if ($array[$d] == $data[0]) { $flag = 1; last;} 
+			if ($array[$d] == $base_color) { $flag = 1; last;} 
 			push @tmp,$d;
 			$d -= 1;
 		}
@@ -340,9 +343,10 @@ sub processing()
 	if ($e) { 
 		my @tmp;
 		my $flag = 0;
-		while($e > 0) {
+		my $line = int ($e/8);
+		while($e > -1 && $e < 64 && $line == int($e/8)) {
 			last if ($array[$e] == 0);
-			if ($array[$e] == $data[0]) { $flag = 1; last;} 
+			if ($array[$e] == $base_color) { $flag = 1; last;} 
 			push @tmp,$e;
 			$e += 1;
 		}
@@ -352,9 +356,9 @@ sub processing()
 	if ($f) { 
 		my @tmp;
 		my $flag = 0;
-		while($f > 0) {
-			last if ($array[$f] == 0);
-			if ($array[$f] == $data[0]) { $flag = 1; last;} 
+		while($f > -1 && $f < 64) {
+			last if ($array[$f] == 0 || int($f/8) == $column);
+			if ($array[$f] == $base_color) { $flag = 1; last;} 
 			push @tmp,$f;
 			$f += 7;
 		}
@@ -362,15 +366,13 @@ sub processing()
 	}
 
 	if ($g) { 
-		#	print "g value : $array[$g] data : $data[0]\n";
 		my @tmp;
 		my $flag = 0;
-		while($g > 0) {
+		while($g > -1 && $g < 64) {
 			last if ($array[$g] == 0);
-			if ($array[$g] == $data[0]) { $flag = 1; last;} 
 			push @tmp,$g;
-			#	print "tmp : @tmp\n";
 			$g += 8;
+			if ($array[$g] == $base_color) { $flag = 1; last;} 
 		}
 		if ($flag) { foreach(@tmp){push @change_ret,$_;}}
 	}
@@ -378,16 +380,14 @@ sub processing()
 	if ($h) { 
 		my @tmp;
 		my $flag = 0;
-		while($h > 0) {
-			last if ($array[$h] == 0);
-			if ($array[$h] == $data[0]) { $flag = 1; last;} 
+		while($h > -1 && $h < 64) {
+			last if ($array[$h] == 0 || int($h/8) == $column);
+			if ($array[$h] == $base_color) { $flag = 1; last;} 
 			push @tmp,$h;
 			$h += 9;
 		}
 		if ($flag) { foreach(@tmp){push @change_ret,$_;}}
 	}
-	#	print "ret : @change_ret\n";
-	return @change_ret;
+	&write(@change_ret);
 }
 
-#print &set_board(1);
