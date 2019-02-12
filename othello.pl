@@ -121,7 +121,8 @@ sub my_turn()
 		if ( $_ == 0 || $_ == 3 || $_ == 5 || $_ == 7 || $_ == 16 || $_ == 24 ||$_ ==  40 ||$_ ==  56 ||$_ ==  58 ||$_ ==  60 ||$_ ==  63 || $_ == 47 ||$_ == 31 || $_ == 15){
 			$put = &onetotwo($_);
 			push @data,$_;
-			print set_board;
+			last;
+			#print set_board;
 		}
 		else {
 			my $rand = int(rand($#ret +1 ));
