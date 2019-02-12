@@ -9,8 +9,8 @@ chomp (my $default_f = `pwd`);
 my $socket = new IO::Socket::INET (
 	PeerHost => '127.0.0.1',
 	#PeerHost => '192.168.1.114',
-	#PeerPort => '8472',
-	PeerPort => "$ARGV[0]",
+	PeerPort => '8472',
+	#PeerPort => "$ARGV[0]",
 	#PeerPort => '5000',
 	Proto => 'tcp',
 );
@@ -86,80 +86,6 @@ sub gameover()
 			print &lost_ascii unless ($win);
 		}
 	}
-	
-	my $wl = 'win';
-	my $color = 'black';
-	$wl = 'lost' unless($win == 1); 
-	$color = 'white' unless ($data[0] == 1);
-
-	my $dir = $default_f."/Mydata/".$color."/".$wl;
-	my $data_dir; shift (@data);
-	foreach(@data){
-		$data_dir .= "/".$_;
-	}
-	my $dd = $dir.$data_dir;
-	$dd =~ s/\/0$//g;
-	
-	print "$dd\n";
-	unless(-d $dd){
-		system("mkdir -p $dd");
-		system("echo 'sum:1' > $dd/data.txt"); 
-		system("echo 'end:end' >> $dd/data.txt"); 
-	}
-
-	my $stack;
-	while($dd ne $dir){
-		$dd =~ s/\/(\d+)$//g;
-		$stack = $1;
-
-		unless (-f "$dd/data.txt"){
-			my $chr = `cat $dd/$stack/data.txt`;
-			my @chr = split(/\n/,$chr);
-			foreach(@chr){
-				if (/(sum):(\d+)$/){
-					#$1 : sum 
-					#$2 : 상위 폴더의 sum 개수
-					#stack : 상위 폴더의 이름
-
-					system("echo '$stack:$2' > $dd/data.txt");
-					system("echo '$1:$2' >> $dd/data.txt");
-				}
-			}
-		}
-		else{ 
-			my $data = `cat $dd/data.txt`;
-			my $data1 = `cat $dd/$stack/data.txt`;
-			my @tmp = split(/\n/,$data);
-			my @tmp2 = split(/\n/,$data1);
-			my $count = 0;
-			my $new;
-			my %hash; 
-			foreach (@tmp2){
-				if (/(sum):(\d+)$/){
-					$hash{$stack} = $2;
-				}
-			}
-			foreach(@tmp){
-				if (/(\d+):(\d+)$/){
-					my $t1 = $1; 
-					my $t2 = $2;
-					if($t1 eq $stack) {$t2++}
-					$hash{$t1} = $t2;
-				}
-				if (/(sum):(\d+)$/){
-					$count = $2;
-				}
-			}
-			foreach(keys(%hash)){
-				$new .= "$_:$hash{$_}\n";
-			}
-			$count ++;
-			$new .= "sum:$count\n";
-			system ("echo '$new' > $dd/data.txt");
-		}
-		if($dd =~ /lost$|win$/ ){last;}
-	}
-
 	$socket->close();
 	exit();
 }
@@ -177,7 +103,7 @@ sub my_turn()
 		push @data,(($column*8) + $row);
 		if ($data[0] == 1) { $array[$data[-1]] = 2}
 		elsif ($data[0] == 2) { $array[$data[-1]] = 1}
-		print set_board(@array);
+		#		print set_board(@array);
 		&processing($data[-1],1);
 	}
 
@@ -190,9 +116,22 @@ sub my_turn()
 		my ($column,$row) = split(/,/,$_);
 		push @ret,(($column*8) + ($row));
 	}
-	my $rand = int(rand($#ret +1 ));
-	my $put = &onetotwo($ret[$rand]);
-	push @data,$ret[$rand];
+	my $put;
+	foreach (@ret){
+		if ( $_ == 0 || $_ == 3 || $_ == 5 || $_ == 7 || $_ == 16 || $_ == 24 ||$_ ==  40 ||$_ ==  56 ||$_ ==  58 ||$_ ==  60 ||$_ ==  63 || $_ == 47 ||$_ == 31 || $_ == 15){
+			$put = &onetotwo($_);
+			push @data,$_;
+			print set_board;
+		}
+		else {
+			my $rand = int(rand($#ret +1 ));
+			$put = &onetotwo($ret[$rand]);
+			push @data,$ret[$rand];
+		}
+	}
+	#	my $rand = int(rand($#ret +1 ));
+	# my $put = &onetotwo($ret[$rand]);
+	# push @data,$ret[$rand];
 	print set_board(@array);
 	&processing($data[-1], 0 );
 	$array[$data[-1]] = $data[0]+2;
